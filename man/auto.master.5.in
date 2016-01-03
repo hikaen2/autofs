@@ -1,0 +1,424 @@
+.\" t
+.TH AUTO.MASTER 5 "11 Apr 2006"
+.SH NAME
+auto.master \- Master Map for automounter
+.SH "DESCRIPTION"
+The
+.B auto.master
+map is consulted to set up automount managed mount points when the
+.nh
+.BR autofs (8)
+.hy
+script is invoked or the
+.nh
+.BR automount (8)
+.hy
+program is run. Each line describes a mount point and refers to an
+autofs map describing file systems to be mounted under the mount
+point.
+.P
+The default location of the master map is
+.nh
+.B @@autofsmapdir@@/auto.master
+.hy
+but an alternate name may be given on the command line when running
+the automounter and the default master map may changed by setting the
+.nh
+.B "MASTER_MAP_NAME"
+.hy
+configuration variable in
+.nh
+.B @@autofsconfdir@@/autofs.
+.hy
+If the master map name has no path then the system Name Service Switch configuration
+will be consulted and each of the sources searched in line with the rules
+given in the Name Service Switch configuration.
+.P
+Access to mounts in maps is governed by a key.
+.P
+For direct maps the mount point is always specified as:
+.P
+/-
+.P
+and the key used within the direct map is the full path to the mount point.
+.P
+For indirect maps access is by using the path scheme:
+.P
+.RI / mount-point / key 
+.P
+where
+.I mount-point
+is one of the entries listed in the master map. The
+.I key
+is a single directory component and is matched against entries in the
+map given in the entry (See
+.BR autofs (5)).
+.P
+Additionally, a map may be included from its source as if it were itself
+present in the master map by including a line of the form:
+.BR +\ [ maptype , format :] map [ options ]
+and 
+.BR automount (8)
+will process the map according to the specification described below for
+map entries.
+.SH "FORMAT"
+Master map entries have three fields separated by an arbitrary number
+of spaces or tabs. Lines beginning with # are comments. The first field
+is the mount point described above and the second field is the name of
+the map to be consulted for the mount point followed by the third field
+which contains options to be applied to all entries in the map.
+.P
+The format of a master map entry is:
+.TP
+.IR mount-point\  [ map-type [, format ]:] map\  [ options ]
+.TP
+\fBmount-point\fP
+Base location for the \fBautofs\fP filesystem to be mounted.  For
+indirect maps this directory will be created (as with \fBmkdir \-p\fP)
+and is removed when the \fBautofs\fP filesystem is umounted.
+.TP
+\fBmap-type\fP
+Type of map used for this mount point.  The following are
+valid map types:
+.RS
+.TP
+.B file
+The map is a regular text file.
+.TP
+.B program
+The map is an executable program, which is passed a key on the command
+line and returns an entry (everything besides the key) on stdout if successful.
+.TP
+.B yp
+The map is a NIS (YP) database.
+.TP
+.B nisplus
+The map is a NIS+ database.
+.TP
+.B hesiod
+The map is a hesiod database whose
+.B filsys
+entries are used for maps.
+.TP
+.B ldap \fPor\fB ldaps
+The map is stored in an LDAP directory. If \fBldaps\fP is used the
+appropriate certificate must be configured in the LDAP client.
+.TP
+.B multi
+This map type allows the specification of multiple maps separated
+by "--". These maps are searched in order to resolve key lookups.
+.TP
+.B dir
+This map type can be used at
+.BR +
+master map including notation. The contents of files under given directory are included
+to the master map. The name of file to be included must be ended with ".autofs". A file
+will be ignored if its name is not ended with the suffix. In addition a dot file, a file
+which name is started with "." is also ignored.
+.RE
+.TP
+\fBformat\fP
+Format of the map data; currently the only formats
+recognized are \fBsun\fP, which is a subset of the Sun automounter map
+format, and \fBhesiod\fP, for hesiod filesys entries.  If the format is
+left unspecified, it defaults to \fBsun\fP for all map types except
+\fBhesiod\fP.
+.TP
+\fBmap\fP
+Name of the map to use.  This is an absolute UNIX pathname
+for maps of types \fBfile\fP, \fBdir\fP, or \fBprogram\fP, and the name of a database
+in the case for maps of type \fByp\fP, \fBnisplus\fP, or \fBhesiod\fP or
+the \fBdn\fP of an LDAP entry for maps of type \fBldap\fP.
+.TP
+\fBoptions\fP
+Any remaining command line arguments without leading dashes (\-) are
+taken as options (\fI\-o\fP) to \fBmount\fP.  Arguments with leading
+dashes are considered options for the maps.
+.sp
+The \fBsun\fP format supports the following options:
+.RS
+.TP
+.I "\-Dvariable=value"
+Replace \fIvariable\fP with \fIvalue\fP in map substitutions.
+.TP
+.I "\-strict"
+Treat errors when mounting file systems as fatal. This is important when
+multiple file systems should be mounted (`multimounts'). If this option
+is given, no file system is mounted at all if at least one file system
+can't be mounted.
+.TP
+.I "nobind"
+This is an autofs specific option that is a pseudo mount option and
+so is given without a leading dash. It may be used either in the master
+map entry (so it effects all the map entries) or with individual map
+entries to prevent bind mounting of local NFS filesystems. Bind mounting
+of NFS file systems can also be prevented for specific map entrys by
+adding the "port=" mount option to the entries.
+.TP
+.I "\-r, \-\-random-multimount-selection"
+Enables the use of ramdom selection when choosing a host from a
+list of replicated servers. This option is applied to this mount
+only, overriding the global setting that may be specified on the
+command line.
+.TP
+.I "\-w, \-\-use-weight-only"
+Use only specified weights for server selection where more than one
+server is specified in the map entry. If no server weights are given
+then each available server will be tried in the order listed, within
+proximity.
+.TP
+.I "\-n, \-\-negative\-timeout <seconds>"
+Set the timeout for caching failed key lookups. This option can be
+used to override the global default given either on the command line
+or in the configuration.
+.SH GENERAL SYSTEM DEFAULTS CONFIGURATION
+.P
+The default value of several general settings may be changed in the
+configuration file
+.nh
+.BR @@autofsconfdir@@/autofs .
+.hy
+They are:
+.TP
+.B TIMEOUT
+sets the default mount timeout (program default 600).
+.TP
+.B NEGATIVE_TIMEOUT
+Set the default timeout for caching failed key lookups (program default
+60). If the equivalent command line option is given it will override this
+setting.
+.TP
+.B MOUNT_WAIT
+Set the default time to wait for a response from a spawned mount(8)
+before sending it a SIGTERM. Note that we still need to wait for the
+RPC layer to timeout before the sub-process exits so this isn't ideal
+but it is the best we can do. The default is to wait until mount(8)
+returns without intervention.
+.TP
+.B UMOUNT_WAIT
+Set the default time to wait for a response from a spawned umount(8)
+before sending it a SIGTERM. Note that we still need to wait for the
+RPC layer to timeout before the sub-process exits so this isn't ideal
+but it is the best we can do.
+.TP
+.B BROWSE_MODE
+Maps are browsable by default (program default "yes").
+.TP
+.B MOUNT_NFS_DEFAULT_PROTOCOL
+Specify the default protocol used by mount.nfs(8) (program default 3). Since
+we can't identify this default automatically we need to set it in the autofs
+configuration.
+.TP
+.B APPEND_OPTIONS
+Determine whether global options, given on the command line or per mount
+in the master map, are appended to map entry options or if the map entry
+options replace the global options (program default "yes", append options).
+.TP
+.B LOGGING
+set default log level "none", "verbose" or "debug" (program default "none").
+.SH BUILTIN MAP -hosts
+If "-hosts" is given as the map then accessing a key under the mount point
+which corresponds to a hostname will allow access to the exports of that
+host. The hosts map cannot be dynamically updated and requires a HUP signal
+to be sent to the daemon for it to check hosts for an update. Due to possible
+hierarchic dependencies within a mount tree, it might not be completely
+updated during the HUP signal processing.
+.P
+For example, with an entry in the master map of
+.nh
+.B /net  -hosts
+.hy
+accessing /net/myserver will mount exports from myserver on directories below
+/net/myserver.
+.P
+NOTE: mounts done from a hosts map will be mounted with the "nosuid,nodev,intr" options
+unless overridden by explicily specifying the "suid", "dev" or "nointr" options in the
+master map entry.
+.SH LDAP MAPS
+If the map type \fBldap\fP is specified the mapname is of the form
+\fB[//servername/]dn\fP, where the optional \fBservername\fP is
+the name of the LDAP server to query, and \fBdn\fP is the Distinguished
+Name of a subtree to search for map entries.
+The old style
+.nh
+.B ldap:servername:mapname
+.hy
+is also understood. Alternatively, the type can be obtained from the Name Service Switch
+configuration, in which case the map name alone must be given.
+.P
+If no schema is set in the autofs configuration then autofs will check
+each of the commonly used schema for a valid entry and if one is found
+it will used for subsequent lookups.
+.P
+There are three common schemas in use:
+.TP
+.I nisMap
+Entries in the \fBnisMap\fP schema are \fBnisObject\fP objects in
+the specified subtree, where the \fBcn\fP attribute is the key
+(the wildcard key is "/"), and the \fBnisMapEntry\fP attribute
+contains the information used by the automounter.
+.TP
+.I automountMap
+The \fBautomountMap\fP schema has two variations that differ in the attribute
+used for the map key. Entries in the automountMap schema are \fBautomount\fP
+objects in the specified subtree, where the \fBcn\fP or \fBautomountKey\fP
+attribute (depending on local usage) is the key (the wildcard key is "/"),
+and the \fBautomountInformation\fP attribute contains the information used
+by the automounter. Note that the \fBcn\fP attribute is case insensitive.
+.P
+The object classes and attributes used for accessing automount maps in
+LDAP can be changed by setting entries in the autofs configuration
+located in
+.nh
+.BR @@autofsconfdir@@/autofs .
+.hy
+.TP
+.B NOTE:
+If a schema is given in the configuration then all the schema configuration
+values must be set, any partial schema specification will be ignored.
+.P
+The configuration settings available are:
+.TP
+.B LDAP_TIMEOUT
+Set the network response timeout (default 8).
+Set timeout value for the synchronous API  calls. The default is the LDAP
+library default of an infinite timeout.
+.TP
+.B LDAP_NETWORK_TIMEOUT
+Set the network response timeout (default 8).
+.TP
+.B LDAP_URI
+A space seperated list of server uris of the form <proto>://<server>[/]
+where <proto> can be ldap or ldaps. The option can be given multiple times.
+Map entries that include a server name override this option and it is then
+not used. Default is an empty list in which case either the server given
+in a map entry or the LDAP configured default is used. This uri list is read at
+startup and whenever the daemon receives a HUP signal.
+.P
+This configuration option can also be used to request autofs lookup SRV RRs
+for a domain of the form <proto>:///[<domain dn>]. Note that a trailing
+"/" is not allowed when using this form. If the domain dn is not specified
+the dns domain name (if any) is used to construct the domain dn for the
+SRV RR lookup. The server list returned from an SRV RR lookup is refreshed
+according to the minimum ttl found in the SRV RR records or after one hour,
+whichever is less.
+.TP
+.B SEARCH_BASE
+The base dn to use when searching for amap base dn. This entry may be
+given multiple times and each will be checked for a map base dn in
+the order they occur in the configuration. The search base list is read
+at startup and whenever the daemon recieves a HUP signal.
+.TP
+.B MAP_OBJECT_CLASS
+The map object class. In the \fBnisMap\fP schema this corresponds to the class
+\fBnisMap\fP and in the \fBautomountMap\fP schema it corresponds to the class
+\fBautomountMap\fP.
+.TP
+.B ENTRY_OBJECT_CLASS
+The map entry object class. In the \fBnisMap\fP schema this corresponds
+to the class \fBnisObject\fP and in the \fBautomountMap\fP schema it
+corresponds to the class \fBautomount\fP.
+.TP
+.B MAP_ATTRIBUTE
+The attribute used to identify the name of the map to which this
+entry belongs.  In the \fBnisMap\fP schema this corresponds to the attribute
+\fBnisMapName\fP and in the \fBautomountMap\fP schema it corresponds to the
+attribute \fBou\fP or \fBautomountMapName\fP.
+.TP
+.B ENTRY_ATTRIBUTE
+The attribute used to identify a map key. In the \fBnisMap\fP schema this
+corresponds to the attribute \fBcn\fP and in the \fBautomountMap\fP schema
+it corresponds to the attribute \fBautomountKey\fP.
+.TP
+.B VALUE_ATTRIBUTE
+The attribute used to identify the value of the map entry. In the \fBnisMap\fP
+schema this corresponds to the attribute \fBnisMapEntry\fP and in the \fBautomountMap\fP
+schema it corresponds to the attribute \fBautomountInformation\fP.
+.TP
+.B NOTE:
+It is essential that entries use class and attribute in a consistent
+manner for correct operation of autofs. For example mixing \fBcn\fP and
+\fBautomountKey\fP attributes in \fBautomount\fP schema map entries won't
+work as expected.
+.SH LDAP AUTHENTICATION, ENCRYPTED AND CERTIFIED CONNECTIONS
+LDAP authenticated binds, TLS encrypted connections and certification
+may be used by setting appropriate values in the autofs authentication
+configuration file and configuring the LDAP client with appropriate
+settings.  The default location of this file is
+.nh
+.BR @@autofsmapdir@@/autofs_ldap_auth.conf .
+.hy
+If this file exists it will be used to establish whether TLS or authentication
+should be used.
+.P
+An example of this file is:
+.sp
+.RS +.2i
+.ta 1.0i
+.nf
+<?xml version="1.0" ?>
+<autofs_ldap_sasl_conf
+        usetls="yes"
+        tlsrequired="no"
+        authrequired="no"
+        authtype="DIGEST-MD5"
+        user="xyz"
+        secret="abc"
+/>
+.fi
+.RE
+.sp
+If TLS encryption is to be used the location of the Certificate Authority
+certificate must be set within the LDAP client configuration in 
+order to validate the server certificate. If, in addition, a certified
+connection is to be used then the client certificate and private key file
+locations must also be configured within the LDAP client.
+.P
+In OpenLDAP these may be configured in the \fBldap.conf\fP file or in the
+per-user configuration. For example it may be sensible to use the system
+wide configuration for the location of the Certificate Authority certificate
+and set the location of the client certificate and private key
+in the per-user configuration. The location of these files and the configuration
+entry requirements is system dependent so the documentation for your
+installation will need to be consulted to get further information.
+.P
+See \fBautofs_ldap_auth.conf\fP(5) for more information.
+.SH EXAMPLE
+.sp
+.RS +.2i
+.ta 1.0i
+.nf
+/-	auto.data
+/home	/etc/auto.home
+/mnt	yp:mnt.map
+.fi
+.RE
+.sp
+This will generate two mountpoints for 
+.IR /home
+and
+.IR /mnt
+and install direct mount triggers for each entry in the direct mount map
+.IR auto.data .
+All accesses to
+.I /home
+will lead to the consultation of the map in
+.IR /etc/auto.home
+and all accesses to
+.I /mnt
+will consult the NIS map
+.IR mnt.map .
+All accesses to paths in the map
+.IR auto.data
+will trigger mounts when they are accessed and the Name Service Switch
+configuration will be used to locate the source of the map
+.IR auto.data .
+.SH "SEE ALSO"
+.BR automount (8),
+.BR autofs (5),
+.BR autofs (8).
+.BR autofs_ldap_auth.conf (5)
+.SH AUTHOR
+This manual page was written by Christoph Lameter <chris@waterf.org>,
+for the Dean GNU/Linux system.  Edited by <hpa@transmeta.com> and
+Ian Kent <raven@themaw.net> .
